@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# -------------------------------
+# Fresh NS2 + NAM Installation Script
+# -------------------------------
+
+echo "Step 0: Remove old NS2/NAM installations..."
+rm -rf ~/ns-allinone-2.35
+sudo rm -f /usr/local/bin/nam
+sudo rm -f /usr/local/bin/ns
+
+# Remove old environment variables from .bashrc
+sed -i '/# NS2 + NAM Environment/,+3d' ~/.bashrc
+
+echo "Step 1: Install dependencies..."
+sudo apt update
+sudo apt upgrade -y
+sudo apt install build-essential autoconf automake libxmu-dev libx11-dev libxext-dev libxt-dev libxft-dev tcl-dev tk-dev perl x11-apps wget -y
+
+echo "Step 2: Download NS2 all-in-one..."
+cd ~
+wget https://sourceforge.net/projects/nsnam/files/allinone/ns-allinone-2.35/ns-allinone-2.35.tar.gz
+tar -xvzf ns-allinone-2.35.tar.gz
+cd ns-allinone-2.35
+
+echo "Step 3: Compile NS2 + NAM..."
+./install
+
+echo "Step 4: Set environment variables..."
+echo '# NS2 + NAM Environment' >> ~/.bashrc
+echo 'export PATH=$PATH:$HOME/ns-allinone-2.35/bin:$HOME/ns-allinone-2.35/tcl8.6.12/unix:$HOME/ns-allinone-2.35/tk8.6.12/unix' >> ~/.bashrc
+echo 'export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/ns-allinone-2.35/otcl-1.14' >> ~/.bashrc
+echo 'export TCL_LIBRARY=$HOME/ns-allinone-2.35/tcl8.6.12/library' >> ~/.bashrc
+source ~/.bashrc
+
+echo "Step 5: Test NS2..."
+ns -v
+
+echo "Step 6: Create sample NS2 simulation..."
+cd ~
+cat > test.tcl << EOL
+# Simple NS2 Simulation with NAM
+set ns [new Simulator]
+set nf [open out.nam w]
+\$ns namtrace-all \$nf
+set n0 [\$ns node]
+set n1 [\$ns node]
+\$ns duplex-link \$n0 \$n1 1Mb 10ms DropTail
+\$ns at 0.5 "finish"
+proc finish {} {
+    global ns nf
+    \$ns flush-trace
+    close \$nf
+    exec nam out.nam
+}
+\$ns run
+EOL
+
+echo "Step 7: Run sample simulation..."
+ns test.tcl
+
+echo "NS2 + NAM installation and test complete!"
